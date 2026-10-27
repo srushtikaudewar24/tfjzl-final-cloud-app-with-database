@@ -138,25 +138,27 @@ def show_exam_result(request, course_id, submission_id):
         enrollment__user=request.user
     )
     questions = Question.objects.filter(course=course).prefetch_related('choice_set')
-    selected = {choice.question_id: choice for choice in submission.choices.all()}
-    exam_results = []
+    chosen = list(submission.choices.select_related('question'))
+    selected_ids = [choice.id for choice in chosen]
+    possible = sum(question.grade for question in questions)
     earned = 0
-    available = 0
+    exam_results = []
     for question in questions:
-        available += question.grade
-        picked = selected.get(question.id)
-        correct = bool(picked and picked.is_correct)
+        question_selected_ids = [choice.id for choice in chosen if choice.question_id == question.id]
+        correct = question.is_get_score(question_selected_ids)
         if correct:
             earned += question.grade
         exam_results.append({
             'question': question,
-            'selected_choice': picked,
-            'correct_choices': [c for c in question.choice_set.all() if c.is_correct],
+            'selected_choice': next((c for c in chosen if c.question_id == question.id), None),
+            'correct_choices': list(question.choice_set.filter(is_correct=True)),
             'is_correct': correct,
         })
-    grade = round(earned * 100 / available, 2) if available else 0
-    return render(request, 'onlinecourse/exam_result_bootstrap.html', {
+    grade = round(earned * 100 / possible, 2) if possible else 0
+    context = {
         'course': course, 'submission': submission, 'exam_results': exam_results,
-        'grade': grade, 'score': earned, 'max_score': available,
-        'passed': bool(available and grade >= 80),
-    })
+        'selected_ids': selected_ids, 'possible': possible,
+        'grade': grade, 'score': earned, 'max_score': possible,
+        'passed': bool(possible and grade >= 80),
+    }
+    return render(request, 'onlinecourse/exam_result_bootstrap.html', context)

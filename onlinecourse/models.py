@@ -97,6 +97,7 @@ class Enrollment(models.Model):
 # Assessment models
 class Question(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, null=True, blank=True)
     question_text = models.CharField(max_length=1000)
     grade = models.IntegerField(default=1)
 

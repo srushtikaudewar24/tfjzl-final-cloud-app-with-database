@@ -101,13 +101,19 @@ class Question(models.Model):
     question_text = models.CharField(max_length=1000)
     grade = models.IntegerField(default=1)
 
+    def is_get_score(self, selected_ids):
+        """Return True when selected answers include the correct choice(s)."""
+        correct_ids = set(self.choice_set.filter(is_correct=True).values_list('id', flat=True))
+        chosen_ids = {int(value) for value in selected_ids}
+        return bool(correct_ids) and correct_ids == chosen_ids
+
     def __str__(self):
         return self.question_text
 
 
 class Choice(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
-    choice_text = models.CharField(max_length=1000)
+    choice_text = models.CharField(max_length=100)
     is_correct = models.BooleanField(default=False)
 
     def __str__(self):
@@ -120,4 +126,4 @@ class Submission(models.Model):
     submitted_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Submission {self.pk} for {self.enrollment.user.username}"
+        return f"Submission for enrollment {self.enrollment_id}"

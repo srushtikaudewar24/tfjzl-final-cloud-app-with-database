@@ -102,35 +102,61 @@ def enroll(request, course_id):
 
     return HttpResponseRedirect(reverse(viewname='onlinecourse:course_details', args=(course.id,)))
 
-
-# <HINT> Create a submit view to create an exam submission record for a course enrollment,
-# you may implement it based on following logic:
-         # Get user and course object, then get the associated enrollment object created when the user enrolled the course
-         # Create a submission object referring to the enrollment
-         # Collect the selected choices from exam form
-         # Add each selected choice object to the submission object
-         # Redirect to show_exam_result with the submission id
-#def submit(request, course_id):
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
+from .models import Question, Choice, Submission
 
 
-# An example method to collect the selected choices from the exam form from the request object
-def extract_answers(request):
-   submitted_anwsers = []
-   for key in request.POST:
-       if key.startswith('choice'):
-           value = request.POST[key]
-           choice_id = int(value)
-           submitted_anwsers.append(choice_id)
-   return submitted_anwsers
+@require_POST
+@login_required
+def submit(request, course_id):
+    """Record a learner's selected choices for their enrolled course."""
+    course = get_object_or_404(Course, pk=course_id)
+    enrollment = get_object_or_404(Enrollment, user=request.user, course=course)
+    questions = Question.objects.filter(course=course)
+    if not questions.exists():
+        return redirect('onlinecourse:course_details', pk=course.id)
+    submission = Submission.objects.create(enrollment=enrollment)
+    valid_choices = Choice.objects.filter(question__course=course)
+    for question in questions:
+        # Form radio inputs use "choice_<question_id>" to prevent duplicate answers.
+        value = request.POST.get(f'choice_{question.id}')
+        if value:
+            choice = valid_choices.filter(pk=value, question=question).first()
+            if choice:
+                submission.choices.add(choice)
+    return redirect('onlinecourse:show_exam_result',
+                    course_id=course.id, submission_id=submission.id)
 
 
-# <HINT> Create an exam result view to check if learner passed exam and show their question results and result for each question,
-# you may implement it based on the following logic:
-        # Get course and submission based on their ids
-        # Get the selected choice ids from the submission record
-        # For each selected choice, check if it is a correct answer or not
-        # Calculate the total score
-#def show_exam_result(request, course_id, submission_id):
-
-
-
+@login_required
+def show_exam_result(request, course_id, submission_id):
+    """Score an exam and show per-question correctness and feedback."""
+    course = get_object_or_404(Course, pk=course_id)
+    submission = get_object_or_404(
+        Submission, pk=submission_id, enrollment__course=course,
+        enrollment__user=request.user
+    )
+    questions = Question.objects.filter(course=course).prefetch_related('choice_set')
+    selected = {choice.question_id: choice for choice in submission.choices.all()}
+    exam_results = []
+    earned = 0
+    available = 0
+    for question in questions:
+        available += question.grade
+        picked = selected.get(question.id)
+        correct = bool(picked and picked.is_correct)
+        if correct:
+            earned += question.grade
+        exam_results.append({
+            'question': question,
+            'selected_choice': picked,
+            'correct_choices': [c for c in question.choice_set.all() if c.is_correct],
+            'is_correct': correct,
+        })
+    grade = round(earned * 100 / available, 2) if available else 0
+    return render(request, 'onlinecourse/exam_result_bootstrap.html', {
+        'course': course, 'submission': submission, 'exam_results': exam_results,
+        'grade': grade, 'score': earned, 'max_score': available,
+        'passed': bool(available and grade >= 80),
+    })

@@ -126,4 +126,4 @@ class Submission(models.Model):
     submitted_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Submission for enrollment {self.enrollment_id}"
+        return f"Submission {self.id} for enrollment {self.enrollment.id}"

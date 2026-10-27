@@ -34,6 +34,25 @@ class ExamFeatureTests(TestCase):
         self.assertContains(response, self.course.name)
         self.assertContains(response, self.lesson.title)
 
+    def test_question_scoring_and_model_contract(self):
+        self.assertTrue(self.question.is_get_score([self.correct.id]))
+        self.assertFalse(self.question.is_get_score([self.wrong.id]))
+        self.assertFalse(self.question.is_get_score([]))
+        self.assertEqual(Choice._meta.get_field('choice_text').max_length, 100)
+        submission = Submission.objects.create(enrollment=self.enrollment)
+        self.assertIn(str(self.enrollment.id), str(submission))
+
+    def test_result_route_and_template_context(self):
+        self.client.force_login(self.user)
+        submission = Submission.objects.create(enrollment=self.enrollment)
+        submission.choices.add(self.correct)
+        url = reverse('onlinecourse:show_exam_result', args=[self.course.id, submission.id])
+        self.assertIn('/course/', url)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['possible'], 5)
+        self.assertIn(self.correct.id, response.context['selected_ids'])
+
     def test_submit_and_congratulations(self):
         self.client.force_login(self.user)
         response = self.client.post(

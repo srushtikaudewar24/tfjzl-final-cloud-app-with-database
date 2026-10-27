@@ -10,10 +10,13 @@
   <div class="ml-auto">{% if user.is_authenticated %}{{ user.username }} · <a href="{% url 'onlinecourse:logout' %}">Logout</a>{% else %}<a href="{% url 'onlinecourse:login' %}">Login</a>{% endif %}</div>
 </nav>
 <main class="container py-4">
-  <h1>{{ course.name }}</h1>
+  <!-- Display the course name using Django template tags. -->
+  <h1 class="display-4">{{ course.name }}</h1>
   <p class="lead">{{ course.description }}</p>
-  <h2>Lessons</h2>
+  <!-- Display every lesson belonging to the course using the lesson_set relation. -->
+  <h2 class="h3 text-primary">Lessons</h2>
   {% for lesson in course.lesson_set.all %}
+    <!-- Bootstrap card for each lesson in the course -->
     <section class="card my-3"><div class="card-header">Lesson {{ lesson.order|add:1 }}: {{ lesson.title }}</div><div class="card-body">{{ lesson.content|linebreaks }}</div></section>
   {% empty %}<p>No lessons have been added.</p>{% endfor %}
   <hr>
